@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>studio dirt 01</title>
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='6' fill='%23EBFF00'/></svg>">
+
+  <style>
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      background: #000;
+    }
+    canvas { display: block; cursor: default; }
+    #ui-panel {
+      position: fixed;
+      top: 16px; right: 16px;
+      background: #000;
+      padding: 1px;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      font-family: 'Inter', Arial, Helvetica, sans-serif;
+      min-width: 180px;
+      max-width: 90vw;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    #ui-panel-header {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      padding: 1px;
+    }
+    #ui-panel-close {
+      background: none; border: none; color: #fff;
+      font-size: 16px; cursor: pointer; padding: 0;
+      width: 20px; height: 20px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    #ui-panel-close:hover { opacity: 0.7; }
+    #ui-panel-minimized {
+      position: fixed; top: 16px; right: 16px;
+      width: 30px; height: 30px;
+      background: #000; border: none; color: #fff;
+      font-size: 16px; cursor: pointer;
+      display: none; align-items: center; justify-content: center;
+      z-index: 10; box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    #ui-panel-minimized:hover { opacity: 0.7; }
+    #ui-panel label {
+      font-size: 10px; color: #fff;
+      display: flex; align-items: center; gap: 1px; padding: 1px;
+    }
+    #ui-panel label span { min-width: 80px; }
+    #ui-panel input[type=color] {
+      width: 32px; height: 24px;
+      border: none !important; border-radius: 0 !important;
+      cursor: pointer; outline: none;
+      box-shadow: none !important;
+      -webkit-appearance: none; appearance: none;
+    }
+    #ui-panel input[type=color]::-webkit-color-swatch-wrapper { padding: 0; border: none !important; }
+    #ui-panel input[type=color]::-webkit-color-swatch { border: none !important; border-radius: 0 !important; }
+    .btn {
+      background: #fff; color: #000; border: none;
+      padding: 1px; margin: 1px;
+      font-size: 9px; font-weight: 500; cursor: pointer;
+      font-family: 'Inter', Arial, Helvetica, sans-serif;
+    }
+    .btn:hover { opacity: 0.8; }
+    .slider-container {
+      position: relative; flex: 1; height: 24px;
+      display: flex; align-items: center;
+    }
+    .slider-track {
+      position: absolute; width: 100%; height: 16px;
+      background: #333; z-index: 1;
+    }
+    #ui-panel input[type=range] {
+      position: absolute; width: 100%; height: 16px; margin: 0;
+      background: transparent;
+      -webkit-appearance: none; appearance: none;
+      cursor: pointer; z-index: 2;
+    }
+    #ui-panel input[type=range]::-webkit-slider-track { height: 16px; background: #333; }
+    #ui-panel input[type=range]::-moz-range-track { height: 16px; background: #333; }
+    #ui-panel input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 0; height: 0; background: transparent;
+    }
+    #ui-panel input[type=range]::-moz-range-thumb { width: 0; height: 0; background: transparent; border: none; }
+    .slider-handle {
+      position: absolute; width: 36px; height: 18px;
+      background: #fff; display: flex;
+      align-items: center; justify-content: center;
+      font-size: 9px; color: #000; font-weight: 500;
+      pointer-events: none; z-index: 3;
+      transform: translateX(-50%);
+    }
+    .toggle-label { cursor: pointer; }
+    .toggle-label input[type=checkbox] {
+      width: 14px; height: 14px; accent-color: #fff; cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+  <button id="ui-panel-minimized">☰</button>
+  <div id="ui-panel">
+    <div id="ui-panel-header">
+      <button id="ui-panel-close">−</button>
+    </div>
+    <label><span>Inner Color</span> <input type="color" id="inner-color" value="#EBFF00"></label>
+    <label><span>Outer Color</span> <input type="color" id="outer-color" value="#DAFCC3"></label>
+    <label><span>Intensity</span>
+      <div class="slider-container">
+        <div class="slider-track"></div>
+        <input type="range" id="intensity" min="0.1" max="5" step="0.01" value="1.5">
+        <div class="slider-handle" id="intensity-handle">1.50</div>
+      </div>
+    </label>
+    <label><span>Max Radius</span>
+      <div class="slider-container">
+        <div class="slider-track"></div>
+        <input type="range" id="radius" min="50" max="600" step="1" value="300">
+        <div class="slider-handle" id="radius-handle">300</div>
+      </div>
+    </label>
+    <label><span>Background</span> <input type="color" id="bg-color" value="#ffffff"></label>
+    <label class="toggle-label"><span>Blur</span> <input type="checkbox" id="blur-toggle"></label>
+    <button class="btn" id="reset-btn">Reset</button>
+    <button class="btn" id="download-btn">Download JPEG</button>
+  </div>
+
+  <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js"}}</script>
+  <script type="module">
+    import * as THREE from 'three';
+
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, preserveDrawingBuffer: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+    // --- SVG path data ---
+    const SVG_PATHS = [
+      'M0 318.269V162.619C0 116.157 22.7667 92.9253 69.694 92.9253H195.143V0H334.531V387.963H69.694C23.2313 387.963 0 365.197 0 318.269ZM139.388 308.977H195.143V171.912H139.388V308.977Z',
+      'M483.321 92.9253V387.963H343.933V92.9253H483.321Z',
+      'M562.452 92.9253H701.84V171.912H632.146V387.963H492.758V162.619C492.758 116.157 515.99 92.9253 562.452 92.9253Z',
+      'M711.006 318.269V0H850.394V92.9253H920.088V171.912H850.394V308.977H920.088V387.963H780.7C733.773 387.963 711.006 365.197 711.006 318.269Z'
+    ];
+    const VB_W = 921, VB_H = 388, DISPLAY_H = 500;
+
+    // --- Offscreen canvases ---
+    const shapeCanvas = document.createElement('canvas');
+    const shapeCtx = shapeCanvas.getContext('2d');
+    const glowCanvas = document.createElement('canvas');
+    const glowCtx = glowCanvas.getContext('2d');
+
+    let shapePixels = null;
+    let shapeW = 0, shapeH = 0;
+
+    function isShapeAt(x, y) {
+      const ix = Math.round(x), iy = Math.round(y);
+      if (ix < 0 || ix >= shapeW || iy < 0 || iy >= shapeH) return false;
+      return shapePixels[(iy * shapeW + ix) * 4] > 128;
+    }
+
+    function findEdgeDots(spacing) {
+      const grid = {};
+      const dots = [];
+      const spacingSq = spacing * spacing;
+      for (let y = 0; y < shapeH; y += 2) {
+        for (let x = 0; x < shapeW; x += 2) {
+          if (!isShapeAt(x, y)) continue;
+          if (isShapeAt(x - 2, y) && isShapeAt(x + 2, y) &&
+              isShapeAt(x, y - 2) && isShapeAt(x, y + 2)) continue;
+
+          const gx = Math.floor(x / spacing);
+          const gy = Math.floor(y / spacing);
+          let tooClose = false;
+          for (let dy = -1; dy <= 1 && !tooClose; dy++) {
+            for (let dx = -1; dx <= 1 && !tooClose; dx++) {
+              const n = grid[(gx + dx) + ',' + (gy + dy)];
+              if (n && (x - n.x) ** 2 + (y - n.y) ** 2 < spacingSq) tooClose = true;
+            }
+          }
+          if (!tooClose) {
+            grid[gx + ',' + gy] = { x, y };
+            dots.push({ x, y });
+          }
+        }
+      }
+      return dots;
+    }
+
+    function buildTextures() {
+      const w = window.innerWidth, h = window.innerHeight;
+      shapeW = w; shapeH = h;
+
+      const sw = DISPLAY_H * VB_W / VB_H;
+      const sh = DISPLAY_H;
+      const ox = (w - sw) / 2;
+      const oy = (h - sh) / 2;
+      const matrix = new DOMMatrix().translate(ox, oy).scale(sw / VB_W, sh / VB_H);
+
+      const path = new Path2D();
+      for (const d of SVG_PATHS) path.addPath(new Path2D(d), matrix);
+
+      // Shape texture
+      shapeCanvas.width = w; shapeCanvas.height = h;
+      shapeCtx.clearRect(0, 0, w, h);
+      shapeCtx.fillStyle = '#ffffff';
+      shapeCtx.fill(path, 'nonzero');
+      shapePixels = shapeCtx.getImageData(0, 0, w, h).data;
+      shapeTex.needsUpdate = true;
+
+      // Edge dots
+      const dots = findEdgeDots(6);
+      console.log('Edge dots:', dots.length);
+
+      // Glow source texture: soft circles at each dot
+      glowCanvas.width = w; glowCanvas.height = h;
+      glowCtx.clearRect(0, 0, w, h);
+      glowCtx.globalCompositeOperation = 'lighter';
+      const GLOW_R = 200;
+      for (const dot of dots) {
+        const grad = glowCtx.createRadialGradient(dot.x, dot.y, 0, dot.x, dot.y, GLOW_R);
+        grad.addColorStop(0,   'rgba(22,22,22,1)');
+        grad.addColorStop(0.1, 'rgba(18,18,18,1)');
+        grad.addColorStop(0.3, 'rgba(12,12,12,1)');
+        grad.addColorStop(0.55,'rgba(6,6,6,1)');
+        grad.addColorStop(0.8, 'rgba(2,2,2,1)');
+        grad.addColorStop(1,   'rgba(0,0,0,0)');
+        glowCtx.fillStyle = grad;
+        glowCtx.beginPath();
+        glowCtx.arc(dot.x, dot.y, GLOW_R, 0, Math.PI * 2);
+        glowCtx.fill();
+      }
+      glowCtx.globalCompositeOperation = 'source-over';
+      glowTex.needsUpdate = true;
+    }
+
+    const shapeTex = new THREE.CanvasTexture(shapeCanvas);
+    shapeTex.minFilter = THREE.LinearFilter;
+    shapeTex.magFilter = THREE.LinearFilter;
+
+    const glowTex = new THREE.CanvasTexture(glowCanvas);
+    glowTex.minFilter = THREE.LinearFilter;
+    glowTex.magFilter = THREE.LinearFilter;
+
+    // --- Distance to shape ---
+    function cursorToShapeDist(cx, cy) {
+      if (!shapePixels) return 999;
+      if (isShapeAt(cx, cy)) return 0;
+      const dirs = 16;
+      for (let r = 2; r <= 200; r += 2) {
+        for (let a = 0; a < dirs; a++) {
+          const angle = a * Math.PI * 2 / dirs;
+          if (isShapeAt(cx + Math.cos(angle) * r, cy + Math.sin(angle) * r)) return r;
+        }
+      }
+      return 999;
+    }
+
+    // --- Config ---
+    let cfg = {
+      innerColor: '#EBFF00',
+      outerColor: '#DAFCC3',
+      intensity: 1.5,
+      radius: 300,
+      bgColor: '#ffffff',
+      blurOn: false
+    };
+    const defaults = { ...cfg };
+
+    // --- Shader ---
+    const SOFTNESS = 1.6;
+
+    const fragmentShader = `
+      precision highp float;
+
+      uniform vec2 uMouse;
+      uniform float uRadius;
+      uniform float uIntensity;
+      uniform float uBlur;
+      uniform float uFade;
+      uniform float uTime;
+      uniform vec2 uPull;
+      uniform vec3 uInnerColor;
+      uniform vec3 uOuterColor;
+      uniform vec3 uBgColor;
+      uniform sampler2D uShapeTex;
+      uniform sampler2D uGlowTex;
+      uniform vec2 uResolution;
+
+      const float SOFT = ${SOFTNESS.toFixed(1)};
+
+      float hash(vec2 p) {
+        return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+      }
+
+      float noise(vec2 p) {
+        vec2 i = floor(p);
+        vec2 f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(
+          mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x),
+          mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x),
+          f.y
+        );
+      }
+
+      float fbm(vec2 p) {
+        float f = 0.0;
+        float amp = 0.5;
+        for (int i = 0; i < 6; i++) {
+          f += amp * noise(p);
+          p *= 2.03;
+          amp *= 0.5;
+        }
+        return f;
+      }
+
+      // Golden-angle spiral Gaussian blur — 128 taps, ultra silky
+      const float GA = 2.399963;
+      const float TAPS = 128.0;
+      float blurShape(vec2 uv, float px) {
+        if (px < 0.5) return texture2D(uShapeTex, uv).r;
+        vec2 texel = 1.0 / uResolution;
+        float total = 0.0;
+        float wSum  = 0.0;
+        for (int i = 0; i < 128; i++) {
+          float fi = float(i);
+          float r = sqrt(fi / TAPS) * px;
+          float a = fi * GA;
+          vec2 off = vec2(cos(a), sin(a)) * r * texel;
+          float w = exp(-1.5 * fi / TAPS);
+          total += texture2D(uShapeTex, uv + off).r * w;
+          wSum  += w;
+        }
+        return total / wSum;
+      }
+
+      void main() {
+        vec2 pixel = gl_FragCoord.xy;
+        vec2 uv = pixel / uResolution;
+
+        float shapeSharp = texture2D(uShapeTex, uv).r;
+
+        // Animated flame time
+        float t1 = uTime * 0.15;
+        float t2 = uTime * 0.11;
+        vec2 noiseUV = pixel * 0.0008;
+
+        // Flowing flame warp — more alive
+        float flameWarpX = fbm(noiseUV + vec2(t1 * 1.0, t1 * 1.4)) - 0.5;
+        float flameWarpY = fbm(noiseUV + vec2(t2 * 1.3, t2 * 0.9) + 50.0) - 0.5;
+        float flameWarpX2 = fbm(noiseUV * 1.8 + vec2(-t2 * 0.8, t1 * 1.1) + 150.0) - 0.5;
+        float flameWarpY2 = fbm(noiseUV * 1.8 + vec2(t1 * 0.9, -t2 * 1.3) + 250.0) - 0.5;
+        float flameRipple = fbm(noiseUV * 2.5 + vec2(t1 * 0.6, -t2 * 1.0) + 200.0);
+
+        // Warp the glow source sampling so colour flows outward from SVG
+        vec2 glowWarp = vec2(flameWarpX + flameWarpX2 * 0.5, flameWarpY + flameWarpY2 * 0.5);
+        vec2 pullOffset = uPull / uResolution;
+        vec2 glowUV = uv - pullOffset + glowWarp * 0.09 * uFade;
+        float glowField = texture2D(uGlowTex, glowUV).r;
+
+        // Early out: nothing here
+        if (glowField < 0.005 && shapeSharp < 0.005) {
+          gl_FragColor = vec4(uBgColor, 1.0);
+          return;
+        }
+
+        // No cursor active
+        if (uRadius < 1.0 || uFade < 0.01) {
+          gl_FragColor = vec4(mix(uBgColor, vec3(0.0), shapeSharp), 1.0);
+          return;
+        }
+
+        // Cursor proximity
+        float distClean = distance(pixel, uMouse);
+        float tClean = 1.0 - smoothstep(0.0, uRadius * 1.15, distClean);
+        float tWide  = 1.0 - smoothstep(0.0, uRadius * 2.5, distClean);
+
+        // Localised blur
+        float blurMix = tClean * tClean * (3.0 - 2.0 * tClean) * uFade;
+        float blurPx = blurMix * uBlur;
+        float shape = mix(shapeSharp, blurShape(uv, blurPx), blurMix);
+
+        // Flame-warped cursor field
+        vec2 warp = vec2(flameWarpX + flameWarpX2, flameWarpY + flameWarpY2) * uRadius * 0.65;
+        float distWarped = distance(pixel + warp, uMouse);
+        float tWarped = 1.0 - smoothstep(0.0, uRadius, distWarped);
+
+        // Glow layers
+        float corePow  = pow(max(tWarped, 0.0), SOFT * 1.0);
+        float haloPow  = pow(max(tClean, 0.0),  SOFT * 0.5);
+        float bloomPow = pow(max(tWide, 0.0),   SOFT * 0.45);
+
+        float core  = glowField * corePow  * uIntensity * 5.5;
+        float halo  = glowField * haloPow  * uIntensity * 2.8;
+        float bloom = glowField * bloomPow * uIntensity * 0.8;
+
+        // Animated colour — richer flame motion
+        float shift1 = fbm(noiseUV * 1.6 + vec2(t1 * 0.45, t2 * 0.65) + 100.0);
+        float shift2 = fbm(noiseUV * 2.8 + vec2(-t2 * 0.35, t1 * 0.5) + 300.0);
+        float shift3 = fbm(noiseUV * 0.8 + vec2(t1 * 0.2, -t2 * 0.3) + 500.0);
+        float flameBlend = shift1 * 0.45 + shift2 * 0.35 + shift3 * 0.2;
+        float pulseWarm = 0.5 + 0.5 * sin(uTime * 0.2 + flameRipple * 6.28);
+
+        vec3 coreColor  = mix(uInnerColor, uOuterColor, flameBlend * 0.4 + pulseWarm * 0.1);
+        vec3 haloColor  = mix(uInnerColor, uOuterColor, 0.35 + flameBlend * 0.3 + pulseWarm * 0.08);
+        vec3 bloomColor = mix(uOuterColor, uInnerColor, flameBlend * 0.2);
+
+        vec3 color = uBgColor;
+        color = mix(color, bloomColor, clamp(bloom * uFade, 0.0, 1.0));
+        color = mix(color, haloColor,  clamp(halo  * uFade, 0.0, 1.0));
+        color = mix(color, coreColor,  clamp(core  * uFade, 0.0, 1.0));
+
+        // Shape on top
+        color = mix(color, vec3(0.0), shape);
+
+        gl_FragColor = vec4(color, 1.0);
+      }
+    `;
+
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        uMouse:      { value: new THREE.Vector2(-9999, -9999) },
+        uRadius:     { value: 0 },
+        uIntensity:  { value: cfg.intensity },
+        uFade:       { value: 0.0 },
+        uTime:       { value: 0.0 },
+        uBlur:       { value: 0.0 },
+        uPull:       { value: new THREE.Vector2(0, 0) },
+        uInnerColor: { value: new THREE.Color(cfg.innerColor) },
+        uOuterColor: { value: new THREE.Color(cfg.outerColor) },
+        uBgColor:    { value: new THREE.Color(cfg.bgColor) },
+        uShapeTex:   { value: shapeTex },
+        uGlowTex:    { value: glowTex },
+        uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) }
+      },
+      vertexShader: `void main() { gl_Position = vec4(position, 1.0); }`,
+      fragmentShader,
+      depthTest: false,
+      depthWrite: false
+    });
+
+    scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material));
+
+    // --- Mouse ---
+    let targetMX = -9999, targetMY = -9999;
+    let smoothMX = -9999, smoothMY = -9999;
+    let cursorActive = false;
+    let paused = false;
+    let fade = 0;
+    let currentRadius = 0;
+    let pullX = 0, pullY = 0;
+    let prevRadius = 0;
+
+    canvas.addEventListener('mousemove', e => {
+      if (paused) return;
+      targetMX = e.offsetX;
+      targetMY = e.offsetY;
+      cursorActive = true;
+    });
+    canvas.addEventListener('mouseleave', () => { if (!paused) cursorActive = false; });
+    canvas.addEventListener('mousedown', e => {
+      e.preventDefault();
+      paused = !paused;
+    });
+
+    function lerp(a, b, t) { return a + (b - a) * t; }
+
+    const startTime = performance.now();
+
+    let pausedTime = 0;
+
+    function animate() {
+      if (!paused) {
+        if (cursorActive && targetMX > -9000) {
+          smoothMX = smoothMX > -9000 ? lerp(smoothMX, targetMX, 0.2) : targetMX;
+          smoothMY = smoothMY > -9000 ? lerp(smoothMY, targetMY, 0.2) : targetMY;
+        }
+
+        const shapeDist = cursorToShapeDist(smoothMX, smoothMY);
+        const THRESHOLD = 250.0;
+        const prox = Math.max(0, 1 - shapeDist / THRESHOLD);
+        const targetRadius = cfg.radius * prox * prox;
+        currentRadius = lerp(currentRadius, targetRadius, 0.15);
+
+        const radiusDelta = currentRadius - prevRadius;
+        prevRadius = currentRadius;
+        const departing = radiusDelta < -0.5;
+        if (departing && smoothMX > -9000) {
+          const cx = shapeW / 2, cy = shapeH / 2;
+          const dx = smoothMX - cx, dy = smoothMY - cy;
+          const len = Math.sqrt(dx * dx + dy * dy) || 1;
+          const pullStrength = Math.min(Math.abs(radiusDelta) * 0.8, 60);
+          pullX = lerp(pullX, (dx / len) * pullStrength, 0.3);
+          pullY = lerp(pullY, (dy / len) * pullStrength, 0.3);
+        } else {
+          pullX = lerp(pullX, 0, 0.08);
+          pullY = lerp(pullY, 0, 0.08);
+        }
+
+        fade = lerp(fade, cursorActive ? 1 : 0, cursorActive ? 0.2 : 0.06);
+        pausedTime = (performance.now() - startTime) * 0.001;
+      }
+
+      const u = material.uniforms;
+      u.uMouse.value.set(smoothMX, shapeH - smoothMY);
+      u.uRadius.value = currentRadius;
+      u.uIntensity.value = cfg.intensity;
+      u.uFade.value = fade;
+      u.uTime.value = pausedTime;
+      u.uPull.value.set(pullX, -pullY);
+
+      renderer.render(scene, camera);
+      requestAnimationFrame(animate);
+    }
+
+    function resize() {
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      material.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
+      buildTextures();
+    }
+    window.addEventListener('resize', resize);
+
+    resize();
+    animate();
+
+    // --- UI ---
+    const sliders = {
+      intensity: { el: document.getElementById('intensity'), handle: document.getElementById('intensity-handle'), min: 0.1, max: 5, fmt: v => v.toFixed(2) },
+      radius:    { el: document.getElementById('radius'),    handle: document.getElementById('radius-handle'),    min: 50,  max: 600, fmt: v => Math.round(v) }
+    };
+
+    function positionHandle(s) {
+      const val = parseFloat(s.el.value);
+      const pct = ((val - s.min) / (s.max - s.min)) * 100;
+      const cw = s.el.closest('.slider-container').offsetWidth;
+      const hw = 36, lo = (hw / 2) / cw * 100, hi = 100 - lo;
+      s.handle.style.left = Math.max(lo, Math.min(hi, pct)) + '%';
+      s.handle.textContent = s.fmt(val);
+    }
+
+    for (const [key, s] of Object.entries(sliders)) {
+      positionHandle(s);
+      s.el.addEventListener('input', () => { cfg[key] = +s.el.value; positionHandle(s); });
+    }
+
+    let activeSlider = null;
+    for (const s of Object.values(sliders)) {
+      s.el.addEventListener('mousedown', () => { activeSlider = s; });
+    }
+    document.addEventListener('mousemove', e => {
+      if (!activeSlider) return;
+      const s = activeSlider;
+      const rect = s.el.getBoundingClientRect();
+      const cw = s.el.closest('.slider-container').offsetWidth;
+      const hw = 36, lo = (hw / 2) / cw * 100, hi = 100 - lo;
+      const pct = Math.max(lo, Math.min(hi, ((e.clientX - rect.left) / rect.width) * 100));
+      s.el.value = s.min + ((pct - lo) / (hi - lo)) * (s.max - s.min);
+      s.el.dispatchEvent(new Event('input'));
+    });
+    document.addEventListener('mouseup', () => { activeSlider = null; });
+
+    document.getElementById('inner-color').addEventListener('input', e => {
+      cfg.innerColor = e.target.value;
+      material.uniforms.uInnerColor.value.set(cfg.innerColor);
+    });
+    document.getElementById('outer-color').addEventListener('input', e => {
+      cfg.outerColor = e.target.value;
+      material.uniforms.uOuterColor.value.set(cfg.outerColor);
+    });
+    document.getElementById('bg-color').addEventListener('input', e => {
+      cfg.bgColor = e.target.value;
+      material.uniforms.uBgColor.value.set(cfg.bgColor);
+    });
+    document.getElementById('blur-toggle').addEventListener('change', e => {
+      cfg.blurOn = e.target.checked;
+      material.uniforms.uBlur.value = cfg.blurOn ? 40.0 : 0.0;
+    });
+
+    const panel = document.getElementById('ui-panel');
+    const minBtn = document.getElementById('ui-panel-minimized');
+    document.getElementById('ui-panel-close').addEventListener('click', () => {
+      panel.style.display = 'none'; minBtn.style.display = 'flex';
+    });
+    minBtn.addEventListener('click', () => {
+      panel.style.display = 'flex'; minBtn.style.display = 'none';
+    });
+
+    document.getElementById('reset-btn').addEventListener('click', () => {
+      Object.assign(cfg, JSON.parse(JSON.stringify(defaults)));
+      document.getElementById('inner-color').value = cfg.innerColor;
+      document.getElementById('outer-color').value = cfg.outerColor;
+      document.getElementById('bg-color').value = cfg.bgColor;
+      material.uniforms.uInnerColor.value.set(cfg.innerColor);
+      material.uniforms.uOuterColor.value.set(cfg.outerColor);
+      material.uniforms.uBgColor.value.set(cfg.bgColor);
+      document.getElementById('blur-toggle').checked = cfg.blurOn;
+      material.uniforms.uBlur.value = cfg.blurOn ? 40.0 : 0.0;
+      for (const [key, s] of Object.entries(sliders)) { s.el.value = cfg[key]; positionHandle(s); }
+    });
+
+    document.getElementById('download-btn').addEventListener('click', () => {
+      renderer.render(scene, camera);
+      const a = document.createElement('a');
+      a.download = 'dirt-glow.jpg';
+      a.href = canvas.toDataURL('image/jpeg', 0.95);
+      a.click();
+    });
+  </script>
+</body>
+</html>
